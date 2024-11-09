@@ -25,6 +25,10 @@ $searchQuery = isset($_GET['search']) ? htmlspecialchars($_GET['search']) : '';
     <title>ARC - Alert Report Collaboration</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
+                body {
+            background-color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
+        }
         .tab-button {
             border-top-left-radius: 10px;
             border-top-right-radius: 10px;

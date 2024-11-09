@@ -46,7 +46,7 @@
                 </a>
             </li>
             <li>
-                <a href="#" class="flex items-center space-x-3 py-2 hover:bg-gray-800 rounded-md transition-colors">
+                <a href="../src/game_management.php" class="flex items-center space-x-3 py-2 hover:bg-gray-800 rounded-md transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 11V7a1 1 0 012 0v4h3l-4 4-4-4h3z" />
                     </svg>

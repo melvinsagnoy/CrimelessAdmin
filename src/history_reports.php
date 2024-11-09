@@ -102,6 +102,10 @@ $chartCounts = json_encode(array_values($chartData));
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+                body {
+            background-color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
+        }
         .modal {
             display: none;
             position: fixed;

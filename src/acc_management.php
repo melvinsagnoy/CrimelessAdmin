@@ -12,6 +12,10 @@ include '../conn.php';
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         /* Styling for tab buttons and modal */
+        body {
+            background-color: #f3f4f6;
+            font-family: 'Inter', sans-serif;
+        }
         .tab-button {
             border-top-left-radius: 10px;
             border-top-right-radius: 10px;
