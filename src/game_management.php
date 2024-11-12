@@ -17,7 +17,7 @@ if ($conn->connect_error) {
 }
 
 
-include '../option_modal/option_modal.php';
+
 // Handle form submission for adding a question
 $message = '';
 $messageType = '';
@@ -36,6 +36,68 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_question'])) {
 
     if ($stmt->execute()) {
         $message = "Question added successfully!";
+        $messageType = 'success';
+    } else {
+        $message = "Error: " . $stmt->error;
+        $messageType = 'error';
+    }
+
+    $stmt->close();
+    $_SESSION['message'] = $message;
+    $_SESSION['message_type'] = $messageType;
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit();
+}
+
+// Handle form submission for adding or updating a reward announcement
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save_reward'])) {
+    $reward_id = isset($_POST['reward_id']) ? intval($_POST['reward_id']) : 0;
+    $announcement_text = htmlspecialchars($_POST['announcement_text']);
+
+    if ($reward_id > 0) {
+        // Update existing reward announcement
+        $sql = "UPDATE reward_announcements SET announcement_text = ?, created_at = NOW() WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("si", $announcement_text, $reward_id);
+
+        if ($stmt->execute()) {
+            $message = "Reward announcement updated successfully!";
+            $messageType = 'success';
+        } else {
+            $message = "Error: " . $stmt->error;
+            $messageType = 'error';
+        }
+    } else {
+        // Insert new reward announcement
+        $sql = "INSERT INTO reward_announcements (announcement_text, created_at) VALUES (?, NOW())";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("s", $announcement_text);
+
+        if ($stmt->execute()) {
+            $message = "Reward announcement added successfully!";
+            $messageType = 'success';
+        } else {
+            $message = "Error: " . $stmt->error;
+            $messageType = 'error';
+        }
+    }
+
+    $stmt->close();
+    $_SESSION['message'] = $message;
+    $_SESSION['message_type'] = $messageType;
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit();
+}
+// Handle deleting a reward announcement
+if (isset($_GET['delete_reward'])) {
+    $reward_id = intval($_GET['delete_reward']);
+
+    $sql = "DELETE FROM reward_announcements WHERE id=?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $reward_id);
+
+    if ($stmt->execute()) {
+        $message = "Reward announcement deleted successfully!";
         $messageType = 'success';
     } else {
         $message = "Error: " . $stmt->error;
@@ -79,6 +141,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['edit_question'])) {
     exit();
 }
 
+// Handle form submission for adding a reward announcement
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['add_reward'])) {
+    $announcement_text = htmlspecialchars($_POST['announcement_text']);
+
+    $sql = "INSERT INTO reward_announcements (announcement_text, created_at) VALUES (?, NOW())";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("s", $announcement_text);
+
+    if ($stmt->execute()) {
+        $message = "Reward announcement added successfully!";
+        $messageType = 'success';
+    } else {
+        $message = "Error: " . $stmt->error;
+        $messageType = 'error';
+    }
+
+    $stmt->close();
+    $_SESSION['message'] = $message;
+    $_SESSION['message_type'] = $messageType;
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit();
+}
+
+// Fetch existing reward announcements
+$rewardQuery = "SELECT * FROM reward_announcements ORDER BY created_at DESC";
+$rewardResult = $conn->query($rewardQuery);
+
 // Handle deleting a question
 if (isset($_GET['delete'])) {
     $question_id = $_GET['delete'];
@@ -106,6 +195,61 @@ if (isset($_GET['delete'])) {
 $sql = "SELECT * FROM game ORDER BY created_at DESC";
 $result = $conn->query($sql);
 
+// Fetch data from game_data table
+$gameDataQuery = "SELECT created_at, score FROM game_data ORDER BY created_at ASC";
+$gameDataResult = $conn->query($gameDataQuery);
+
+$dates = [];
+$scores = [];
+
+while ($row = $gameDataResult->fetch_assoc()) {
+    // Log the fetched date and score for debugging
+    error_log("Fetched Date: " . $row['created_at']);
+    error_log("Fetched Score: " . $row['score']);
+
+    $dates[] = $row['created_at'];
+    $scores[] = (float) $row['score']; // Cast to float to ensure it's a number
+}
+
+
+// SQL query for Leaderboard with total score calculation
+$leaderboardQuery = "
+    SELECT u.username, SUM(g.score) AS total_score
+    FROM game_data g
+    JOIN users u ON g.user_id = u.id
+    GROUP BY u.username
+    ORDER BY total_score DESC
+";
+$leaderboardResult = $conn->query($leaderboardQuery);
+
+// Initialize leaderboard array
+$leaderboard = [];
+
+if ($leaderboardResult->num_rows > 0) {
+    while ($row = $leaderboardResult->fetch_assoc()) {
+        $leaderboard[] = $row;
+    }
+}
+
+// SQL query for Track Scores with usernames
+$trackScoresQuery = "
+    SELECT g.id, u.username, g.score, g.created_at
+    FROM game_data g
+    JOIN users u ON g.user_id = u.id
+    ORDER BY g.created_at DESC
+";
+$trackScoresResult = $conn->query($trackScoresQuery);
+
+// Initialize an array to store scores
+$scores = [];
+
+if ($trackScoresResult->num_rows > 0) {
+    while ($row = $trackScoresResult->fetch_assoc()) {
+        $scores[] = $row;
+    }
+}
+
+
 $conn->close();
 ?>
 
@@ -117,6 +261,8 @@ $conn->close();
     <title>Admin Game Questions</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"> <!-- Font Awesome for icons -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script> <!-- Include the date adapter -->
     <style>
         /* Custom Styles for Beautification */
         /* Custom Styles for Beautification */
@@ -554,6 +700,167 @@ function closeModal() {
         </div>
     </div>
 
+<!-- Track Scores Modal -->
+<div id="trackScoresModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">Track Scores</div>
+        <table class="min-w-full bg-white border border-gray-200">
+            <thead>
+                <tr>
+                    <th class="py-2 px-4 border-b">ID</th>
+                    <th class="py-2 px-4 border-b">Username</th>
+                    <th class="py-2 px-4 border-b">Score</th>
+                    <th class="py-2 px-4 border-b">Created At</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($scores as $score): ?>
+                    <tr>
+                        <td class="py-2 px-4 border-b"><?= isset($score['id']) ? htmlspecialchars($score['id']) : 'N/A'; ?></td>
+                        <td class="py-2 px-4 border-b"><?= isset($score['username']) ? htmlspecialchars($score['username']) : 'N/A'; ?></td>
+                        <td class="py-2 px-4 border-b"><?= isset($score['score']) ? htmlspecialchars($score['score']) : 'N/A'; ?></td>
+                        <td class="py-2 px-4 border-b"><?= isset($score['created_at']) ? htmlspecialchars($score['created_at']) : 'N/A'; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <button onclick="closeModal('trackScoresModal')" class="button-secondary mt-4">Close</button>
+    </div>
+</div>
+
+<div id="trackProgressModal" class="modal">
+    <div class="modal-content">
+        <canvas id="progressChart"></canvas>
+        <script>
+    // Prepare date labels and score data
+    const labels = <?php echo json_encode(array_map(function($date) {
+        return date("Y-m-d", strtotime($date)); // Format to 'YYYY-MM-DD'
+    }, $dates)); ?>;
+    const data = <?php echo json_encode($scores); ?>;
+
+    // Create the Chart.js line chart
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    const progressChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Score Progress',
+                data: data,
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                borderWidth: 2,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'day',
+                        tooltipFormat: 'MMM dd, yyyy'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                title: {
+                    display: true,
+                    text: 'Score'
+                },
+                min: 0, // Set the minimum value of the y-axis
+                max: 10, // Adjust the maximum value based on your score range
+                beginAtZero: true
+            }
+            }
+        }
+    });
+    
+</script>
+
+        <button onclick="closeModal('trackProgressModal')" class="button-secondary mt-4">Close</button>
+    </div>
+</div>
+
+<!-- Leaderboard Modal -->
+<div id="leaderboardModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">Leaderboard</div>
+        <p>This modal shows the ranking of participants based on total scores.</p>
+        <table class="min-w-full bg-white border border-gray-200">
+            <thead>
+                <tr>
+                    <th class="py-2 px-4 border-b">Rank</th>
+                    <th class="py-2 px-4 border-b">Username</th>
+                    <th class="py-2 px-4 border-b">Total Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $rank = 1; ?>
+                <?php foreach ($leaderboard as $lead): ?>
+                    <tr>
+                        <td class="py-2 px-4 border-b"><?= $rank++; ?></td>
+                        <td class="py-2 px-4 border-b"><?= isset($lead['username']) ? htmlspecialchars($lead['username']) : 'N/A'; ?></td>
+                        <td class="py-2 px-4 border-b"><?= isset($lead['total_score']) ? htmlspecialchars($lead['total_score']) : 'N/A'; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <button onclick="closeModal('leaderboardModal')" class="button-secondary mt-4">Close</button>
+    </div>
+</div>
+
+
+
+<!-- Rewards Modal for Adding/Editing Announcements -->
+<div id="rewardsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">Edit Reward Announcement</div>
+        <form method="POST">
+            <input type="hidden" name="reward_id" id="reward_id"> <!-- Hidden input for Reward ID -->
+            <div class="mb-4">
+                <label for="announcement_text" class="block text-gray-700 font-bold mb-2">Announcement Text:</label>
+                <textarea name="announcement_text" id="announcement_text" class="form-input" rows="4" required></textarea>
+            </div>
+            <div class="flex justify-end space-x-4">
+                <button type="submit" name="save_reward" class="button-primary">Save Announcement</button>
+                <button type="button" onclick="closeRewardsModal()" class="button-secondary">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+        
+    </div>
+    <div class="mt-6">
+    <h2 class="text-xl font-bold mb-4">Rewards Announcements</h2>
+    <?php if ($rewardResult->num_rows > 0): ?>
+        <?php while ($row = $rewardResult->fetch_assoc()): ?>
+            <div class="bg-white p-4 rounded-lg shadow mb-4 relative">
+                <p class="text-gray-700"><?= htmlspecialchars($row['announcement_text']); ?></p>
+                <p class="text-gray-500 text-sm mt-2">Created At: <?= htmlspecialchars($row['created_at']); ?></p>
+                
+                <!-- Three-dot menu icon -->
+                <div class="absolute top-4 right-4">
+                    <button onclick="toggleDropdown(<?= $row['id']; ?>)" class="text-gray-600 hover:text-gray-800">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <!-- Dropdown Menu -->
+                    <div id="dropdown-<?= $row['id']; ?>" class="hidden absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg">
+                        <a href="javascript:void(0);" onclick="editReward(<?= $row['id']; ?>, '<?= addslashes($row['announcement_text']); ?>')" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Edit</a>
+                        <a href="javascript:void(0);" onclick="deleteReward(<?= $row['id']; ?>)" class="block px-4 py-2 text-sm text-red-700 hover:bg-red-100">Delete</a>
+                    </div>
+                </div>
+            </div>
+        <?php endwhile; ?>
+    <?php else: ?>
+        <p class="text-gray-700">No reward announcements found.</p>
+    <?php endif; ?>
+</div>
+
     <!-- Edit Question Modal -->
     <div id="editQuestionModal" class="modal">
         <div class="modal-content">
@@ -684,6 +991,15 @@ function closeAllModals() {
     modals.forEach(modal => modal.classList.remove('show'));
 }
 
+function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('show');
+        } else {
+            console.error('Modal with ID ' + modalId + ' not found.');
+        }
+    }
+
 // Close modal by clicking outside
 window.addEventListener('click', function(event) {
     const modals = document.querySelectorAll('.modal');
@@ -693,6 +1009,36 @@ window.addEventListener('click', function(event) {
         }
     });
 });
+
+function toggleDropdown(id) {
+    const dropdown = document.getElementById('dropdown-' + id);
+    dropdown.classList.toggle('hidden'); // Toggle the visibility of the dropdown
+}
+
+function editReward(id, announcementText) {
+    // Open the modal and populate it with the current data
+    document.getElementById('rewardsModal').classList.add('show');
+    document.getElementById('reward_id').value = id; // Set the reward ID
+    document.getElementById('announcement_text').value = announcementText; // Set the announcement text
+}
+
+function deleteReward(id) {
+    if (confirm('Are you sure you want to delete this reward announcement?')) {
+        // Redirect to delete the reward (modify the URL as needed)
+        window.location.href = "?delete_reward=" + id;
+    }
+}
+
+// Close the dropdown when clicking outside
+window.addEventListener('click', function(event) {
+    const dropdowns = document.querySelectorAll('[id^="dropdown-"]');
+    dropdowns.forEach(dropdown => {
+        if (!dropdown.contains(event.target) && event.target.closest('.fa-ellipsis-v') === null) {
+            dropdown.classList.add('hidden');
+        }
+    });
+});
+
 
 </script>
 </html>
