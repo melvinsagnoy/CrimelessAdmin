@@ -527,17 +527,47 @@ window.addEventListener('click', function(event) {
     }
 });
 
-function openModal(questionId, question, optionA, optionB, optionC, optionD, correctOption, points) {
-    document.getElementById('editQuestionModal').classList.add('show');
-    document.getElementById('question_id').value = questionId;
-    document.getElementById('edit_question').value = question;
-    document.getElementById('edit_option_a').value = optionA;
-    document.getElementById('edit_option_b').value = optionB;
-    document.getElementById('edit_option_c').value = optionC;
-    document.getElementById('edit_option_d').value = optionD;
-    document.getElementById('edit_correct_option').value = correctOption;
-    document.getElementById('edit_points').value = points;
+
+function closeRewardsModal() {
+    const modal = document.getElementById('rewardsModal');
+    if (modal) {
+        modal.style.display = 'none'; // Hide the modal
+    }
 }
+
+function openModalquestion(questionId, question, optionA, optionB, optionC, optionD, correctOption, points) {
+    console.log('Populating modal with:', {
+        questionId,
+        question,
+        optionA,
+        optionB,
+        optionC,
+        optionD,
+        correctOption,
+        points,
+    });
+
+    // Show the modal
+    const modal = document.getElementById('editQuestionModal');
+    if (modal) {
+        modal.classList.add('show');
+
+        // Populate fields
+        document.getElementById('question_id').value = questionId;
+        document.getElementById('edit_question').value = question;
+        document.getElementById('edit_option_a').value = optionA;
+        document.getElementById('edit_option_b').value = optionB;
+        document.getElementById('edit_option_c').value = optionC;
+        document.getElementById('edit_option_d').value = optionD;
+        document.getElementById('edit_correct_option').value = correctOption;
+        document.getElementById('edit_points').value = points;
+    } else {
+        console.error('Edit Question Modal not found.');
+        
+    }
+}
+
+
 
 function closeModal() {
     document.getElementById('editQuestionModal').classList.remove('show');
@@ -574,7 +604,19 @@ function closeModal() {
                     <?php while ($row = $result->fetch_assoc()): ?>
                         <div class="social-post">
                             <div class="icon-container">
-                                <i class="fas fa-edit icon" title="Edit" onclick="openModal(<?= $row['id']; ?>, '<?= addslashes($row['question']); ?>', '<?= addslashes($row['option_a']); ?>', '<?= addslashes($row['option_b']); ?>', '<?= addslashes($row['option_c']); ?>', '<?= addslashes($row['option_d']); ?>', '<?= addslashes($row['correct_option']); ?>', <?= $row['points']; ?>)"></i>
+                            <i class="fas fa-edit icon" 
+   title="Edit" 
+   onclick="openModalquestion(
+      <?= $row['id']; ?>, 
+      '<?= addslashes($row['question']); ?>', 
+      '<?= addslashes($row['option_a']); ?>', 
+      '<?= addslashes($row['option_b']); ?>', 
+      '<?= addslashes($row['option_c']); ?>', 
+      '<?= addslashes($row['option_d']); ?>', 
+      '<?= addslashes($row['correct_option']); ?>', 
+      <?= $row['points']; ?>)">
+</i>
+
                                 <a href="javascript:void(0);" onclick="confirmDelete(<?= $row['id']; ?>)">
                                     <i class="fas fa-trash icon" title="Delete"></i>
                                 </a>
