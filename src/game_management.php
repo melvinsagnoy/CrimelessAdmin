@@ -4,7 +4,7 @@ session_start(); // Start the session for handling messages
 // Database connection
 $servername = "localhost";
 $username = "root"; // Your database username
-$password = ""; // Your database password
+$password = ""; // Your database password   
 $dbname = "crimeless_db"; // Your database name
 
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -195,21 +195,17 @@ if (isset($_GET['delete'])) {
 $sql = "SELECT * FROM game ORDER BY created_at DESC";
 $result = $conn->query($sql);
 
-// Fetch data from game_data table
-$gameDataQuery = "SELECT created_at, score FROM game_data ORDER BY created_at ASC";
+$gameDataQuery = "
+    SELECT DATE(created_at) AS date, SUM(score) AS total_score 
+    FROM game_data 
+    GROUP BY DATE(created_at) 
+    ORDER BY date ASC
+";
+
 $gameDataResult = $conn->query($gameDataQuery);
 
-$dates = [];
-$scores = [];
 
-while ($row = $gameDataResult->fetch_assoc()) {
-    // Log the fetched date and score for debugging
-    error_log("Fetched Date: " . $row['created_at']);
-    error_log("Fetched Score: " . $row['score']);
 
-    $dates[] = $row['created_at'];
-    $scores[] = (float) $row['score']; // Cast to float to ensure it's a number
-}
 
 
 // SQL query for Leaderboard with total score calculation
@@ -231,6 +227,8 @@ if ($leaderboardResult->num_rows > 0) {
     }
 }
 
+
+$scores = [];
 // SQL query for Track Scores with usernames
 $trackScoresQuery = "
     SELECT g.id, u.username, g.score, g.created_at
@@ -238,15 +236,19 @@ $trackScoresQuery = "
     JOIN users u ON g.user_id = u.id
     ORDER BY g.created_at DESC
 ";
-$trackScoresResult = $conn->query($trackScoresQuery);
 
-// Initialize an array to store scores
-$scores = [];
+$trackScoresResult = $conn->query($trackScoresQuery);
 
 if ($trackScoresResult->num_rows > 0) {
     while ($row = $trackScoresResult->fetch_assoc()) {
         $scores[] = $row;
     }
+}
+
+// Proceed with the foreach loop
+foreach ($scores as $scoreEntry) {
+    $progressChartDates[] = date('Y-m-d', strtotime($scoreEntry['created_at'])); // Extract the date
+    $progressChartScores[] = (float)$scoreEntry['score']; // Extract the score as float
 }
 
 
@@ -531,7 +533,11 @@ window.addEventListener('click', function(event) {
 function closeRewardsModal() {
     const modal = document.getElementById('rewardsModal');
     if (modal) {
-        modal.style.display = 'none'; // Hide the modal
+        modal.classList.remove('show'); // Hide the modal by removing the 'show' class
+
+        // Reset the form fields to clear any data
+        document.getElementById('reward_id').value = '';
+        document.getElementById('announcement_text').value = '';
     }
 }
 
@@ -572,6 +578,13 @@ function openModalquestion(questionId, question, optionA, optionB, optionC, opti
 function closeModal() {
     document.getElementById('editQuestionModal').classList.remove('show');
 }
+
+window.addEventListener('click', function(event) {
+    const modal = document.getElementById('rewardsModal');
+    if (event.target === modal) {
+        closeRewardsModal(); // Close the modal if the overlay is clicked
+    }
+});
 
 
 
@@ -772,58 +785,64 @@ function closeModal() {
 
 <div id="trackProgressModal" class="modal">
     <div class="modal-content">
-        <canvas id="progressChart"></canvas>
+        <canvas id="progressChart" width="400" height="200"></canvas>
         <script>
-    // Prepare date labels and score data
-    const labels = <?php echo json_encode(array_map(function($date) {
-        return date("Y-m-d", strtotime($date)); // Format to 'YYYY-MM-DD'
-    }, $dates)); ?>;
-    const data = <?php echo json_encode($scores); ?>;
+            // Fetch PHP-generated data
+            const chartLabels = <?php echo json_encode($progressChartDates); ?>; // Dates
+            const chartData = <?php echo json_encode($progressChartScores); ?>; // Scores
 
-    // Create the Chart.js line chart
-    const ctx = document.getElementById('progressChart').getContext('2d');
-    const progressChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Score Progress',
-                data: data,
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                borderWidth: 2,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: {
-                    type: 'time',
-                    time: {
-                        unit: 'day',
-                        tooltipFormat: 'MMM dd, yyyy'
+            // Debugging
+            console.log("Progress Chart Labels:", chartLabels);
+            console.log("Progress Chart Data:", chartData);
+
+            // Render the chart if data is available
+            if (chartLabels.length && chartData.length) {
+                const ctx = document.getElementById('progressChart').getContext('2d');
+                const progressChart = new Chart(ctx, {
+                    type: 'line', // Line chart with area fill
+                    data: {
+                        labels: chartLabels, // X-axis: Dates
+                        datasets: [{
+                            label: 'Score Progress',
+                            data: chartData, // Y-axis: Scores
+                            borderColor: 'rgba(75, 192, 192, 1)', // Line color
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)', // Area fill color
+                            borderWidth: 2,
+                            fill: true, // Enable area fill
+                            tension: 0.3, // Smooth curves
+                        }]
                     },
-                    title: {
-                        display: true,
-                        text: 'Date'
-                    }
-                },
-                y: {
-                title: {
-                    display: true,
-                    text: 'Score'
-                },
-                min: 0, // Set the minimum value of the y-axis
-                max: 10, // Adjust the maximum value based on your score range
-                beginAtZero: true
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                            },
+                        },
+                        scales: {
+                            x: {
+                                type: 'category', // Use categories for dates
+                                title: {
+                                    display: true,
+                                    text: 'Date',
+                                },
+                            },
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Score',
+                                },
+                            },
+                        },
+                    },
+                });
+            } else {
+                // Show a message if no data is available
+                document.getElementById('progressChart').parentNode.innerHTML = '<p style="text-align: center;">No data available to display.</p>';
             }
-            }
-        }
-    });
-    
-</script>
-
+        </script>
         <button onclick="closeModal('trackProgressModal')" class="button-secondary mt-4">Close</button>
     </div>
 </div>
@@ -1057,11 +1076,13 @@ function toggleDropdown(id) {
     dropdown.classList.toggle('hidden'); // Toggle the visibility of the dropdown
 }
 
-function editReward(id, announcementText) {
-    // Open the modal and populate it with the current data
-    document.getElementById('rewardsModal').classList.add('show');
-    document.getElementById('reward_id').value = id; // Set the reward ID
-    document.getElementById('announcement_text').value = announcementText; // Set the announcement text
+function editReward(id = '', announcementText = '') {
+    const modal = document.getElementById('rewardsModal');
+    if (modal) {
+        modal.classList.add('show'); // Add the 'show' class to display the modal
+        document.getElementById('reward_id').value = id; // Set the reward ID, or leave empty for new rewards
+        document.getElementById('announcement_text').value = announcementText; // Populate announcement text, or leave empty
+    }
 }
 
 function deleteReward(id) {
